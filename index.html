@@ -1,0 +1,1101 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Seifenblasen">
+<meta name="application-name" content="Seifenblasen">
+<meta name="theme-color" content="#000000">
+<meta name="color-scheme" content="dark">
+<meta name="format-detection" content="telephone=no">
+<title>Seifenblasen</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icon-512.png">
+<style>
+  :root {
+    --sat: env(safe-area-inset-top, 0px);
+    --sab: env(safe-area-inset-bottom, 0px);
+    --sal: env(safe-area-inset-left, 0px);
+    --sar: env(safe-area-inset-right, 0px);
+    --fg: rgba(255,255,255,0.92);
+    --fg-dim: rgba(255,255,255,0.6);
+    --glass: rgba(22,22,30,0.55);
+    --glass-border: rgba(255,255,255,0.14);
+  }
+  html, body {
+    margin: 0; padding: 0;
+    position: fixed; inset: 0;
+    width: 100%; height: 100%;
+    overflow: hidden;
+    background: #000;
+    color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, "Segoe UI", Roboto, sans-serif;
+    touch-action: none;
+    overscroll-behavior: none;
+    -webkit-user-select: none; user-select: none;
+    -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  #bg {
+    position: fixed; inset: 0;
+    background: #000 center / cover no-repeat;
+    pointer-events: none;
+  }
+  #c {
+    position: fixed; top: 0; left: 0;
+    width: 100%; height: 100%;
+    display: block;
+    touch-action: none;
+  }
+  /* Start-Overlay */
+  #overlay {
+    position: fixed; inset: 0;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 22px;
+    padding: calc(var(--sat) + 24px) calc(var(--sar) + 24px) calc(var(--sab) + 24px) calc(var(--sal) + 24px);
+    background: radial-gradient(ellipse at center, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0.35) 60%, rgba(0,0,0,0.55) 100%);
+    transition: opacity .6s ease;
+    text-align: center;
+    z-index: 10;
+  }
+  #overlay.gone { opacity: 0; pointer-events: none; }
+  #overlay h1 {
+    margin: 0;
+    font-weight: 200;
+    font-size: 44px;
+    letter-spacing: 0.04em;
+    background: linear-gradient(100deg, #ff8ad8 0%, #9fd8ff 35%, #c9ffb0 65%, #ffe28a 100%);
+    -webkit-background-clip: text; background-clip: text;
+    color: transparent;
+    text-shadow: 0 0 30px rgba(160,200,255,0.15);
+  }
+  #overlay p { margin: 0; color: rgba(255,255,255,0.72); text-shadow: 0 1px 8px rgba(0,0,0,0.9); font-size: 15px; line-height: 1.4; max-width: 300px; }
+  #start {
+    appearance: none; -webkit-appearance: none;
+    border: 1px solid rgba(255,255,255,0.28);
+    background: linear-gradient(180deg, rgba(255,255,255,0.18), rgba(255,255,255,0.06));
+    -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+    color: #fff;
+    font: inherit; font-size: 22px; font-weight: 500; letter-spacing: 0.02em;
+    padding: 18px 56px;
+    border-radius: 999px;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.25);
+    cursor: pointer;
+  }
+  #start:active { transform: scale(0.97); }
+  #tip { font-size: 13px !important; opacity: 0.85; }
+  #tip[hidden] { display: none; }
+  /* Zahnrad */
+  #gear {
+    position: fixed;
+    left: 50%;
+    bottom: calc(var(--sab) + 18px);
+    width: 46px; height: 46px; margin-left: -23px;
+    border-radius: 50%;
+    border: 1px solid var(--glass-border);
+    background: var(--glass);
+    -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+    color: var(--fg);
+    display: flex; align-items: center; justify-content: center;
+    opacity: 0; pointer-events: none;
+    transition: opacity .35s ease;
+    padding: 0;
+    z-index: 5;
+  }
+  #gear.show { opacity: 0.75; pointer-events: auto; }
+  #gear svg { width: 22px; height: 22px; }
+  /* Einstellungen */
+  #panel {
+    position: fixed;
+    left: 50%;
+    bottom: calc(var(--sab) + 14px);
+    transform: translate(-50%, 0);
+    width: min(360px, calc(100% - 28px - var(--sal) - var(--sar)));
+    max-height: calc(100% - var(--sat) - var(--sab) - 28px);
+    overflow-y: auto;
+    padding: 18px 18px 16px;
+    border-radius: 22px;
+    border: 1px solid var(--glass-border);
+    background: rgba(18,18,26,0.62);
+    -webkit-backdrop-filter: blur(22px) saturate(1.3); backdrop-filter: blur(22px) saturate(1.3);
+    box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+    transition: opacity .25s ease, transform .25s ease;
+    z-index: 6;
+    touch-action: pan-y;
+  }
+  #panel.hidden { opacity: 0; transform: translate(-50%, 16px); pointer-events: none; }
+  #panel h2 { margin: 0 0 12px; font-size: 17px; font-weight: 600; text-align: center; }
+  .field { display: block; margin: 0 0 12px; }
+  .field .lbl { display: flex; justify-content: space-between; font-size: 14px; color: var(--fg); margin-bottom: 6px; }
+  .field output { color: var(--fg-dim); font-variant-numeric: tabular-nums; }
+  input[type=range] {
+    -webkit-appearance: none; appearance: none;
+    width: 100%; height: 28px; background: transparent; margin: 0;
+    touch-action: none;
+  }
+  input[type=range]::-webkit-slider-runnable-track {
+    height: 4px; border-radius: 2px;
+    background: linear-gradient(90deg, #ff7ad0, #8fd3ff, #b8ff9c, #ffe07a);
+    opacity: 0.85;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none;
+    width: 24px; height: 24px; margin-top: -10px; border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #fff 0%, #e8f2ff 30%, #b8c8e8 100%);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.45);
+    border: none;
+  }
+  input[type=range]::-moz-range-track { height: 4px; border-radius: 2px; background: linear-gradient(90deg, #ff7ad0, #8fd3ff, #b8ff9c, #ffe07a); }
+  input[type=range]::-moz-range-thumb { width: 24px; height: 24px; border-radius: 50%; background: #eef4ff; border: none; }
+  .row { display: flex; gap: 10px; margin: 4px 0 12px; }
+  .btn {
+    flex: 1;
+    appearance: none; -webkit-appearance: none;
+    display: inline-flex; align-items: center; justify-content: center;
+    font: inherit; font-size: 15px; font-weight: 500;
+    color: #fff;
+    padding: 11px 10px;
+    border-radius: 12px;
+    border: 1px solid rgba(255,255,255,0.16);
+    background: rgba(255,255,255,0.09);
+    cursor: pointer;
+  }
+  .btn:active { background: rgba(255,255,255,0.18); }
+  .btn.primary { width: 100%; background: rgba(255,255,255,0.18); }
+  #file { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+  /* Toast */
+  #toast {
+    position: fixed;
+    left: 50%; top: calc(var(--sat) + 14px);
+    transform: translate(-50%, -8px);
+    padding: 10px 18px;
+    border-radius: 999px;
+    background: rgba(20,20,28,0.7);
+    -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+    border: 1px solid var(--glass-border);
+    font-size: 14px;
+    opacity: 0; pointer-events: none;
+    transition: opacity .3s ease, transform .3s ease;
+    white-space: nowrap;
+    z-index: 20;
+  }
+  #toast.show { opacity: 1; transform: translate(-50%, 0); }
+</style>
+</head>
+<body>
+<div id="bg"></div>
+<canvas id="c"></canvas>
+
+<div id="overlay">
+  <h1>Seifenblasen</h1>
+  <p>Ein ruhiger Bildschirmschoner. Neige das Telefon, um die Blasen treiben zu lassen.</p>
+  <button id="start" type="button">Starten</button>
+  <p id="tip" hidden>Für Vollbild: Teilen → Zum Home-Bildschirm</p>
+</div>
+
+<button id="gear" type="button" aria-label="Einstellungen">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="3.2"/>
+    <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.03 1.56V21a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1.11-1.56 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.56-1.03H3a2 2 0 1 1 0-4h.09a1.7 1.7 0 0 0 1.56-1.11 1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.34H9a1.7 1.7 0 0 0 1.03-1.56V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1.03 1.56 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87V9a1.7 1.7 0 0 0 1.56 1.03H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.56 1.03z"/>
+  </svg>
+</button>
+
+<div id="panel" class="hidden" role="dialog" aria-label="Einstellungen">
+  <h2>Einstellungen</h2>
+  <label class="field"><span class="lbl">Anzahl Blasen <output id="o-count"></output></span>
+    <input type="range" id="s-count" min="4" max="30" step="1"></label>
+  <label class="field"><span class="lbl">Größe <output id="o-size"></output></span>
+    <input type="range" id="s-size" min="0.5" max="1.6" step="0.05"></label>
+  <label class="field"><span class="lbl">Geschwindigkeit <output id="o-speed"></output></span>
+    <input type="range" id="s-speed" min="0.2" max="3" step="0.05"></label>
+  <label class="field"><span class="lbl">Neige-Empfindlichkeit <output id="o-tilt"></output></span>
+    <input type="range" id="s-tilt" min="0" max="2.5" step="0.05"></label>
+  <div class="row">
+    <label class="btn" for="file" id="b-img">Bild wählen</label>
+    <button class="btn" type="button" id="b-black">Schwarz</button>
+  </div>
+  <input type="file" id="file" accept="image/*">
+  <button class="btn primary" type="button" id="b-close">Schließen</button>
+</div>
+
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(() => {
+'use strict';
+
+// ---------------------------------------------------------------------------
+// Grundlagen
+// ---------------------------------------------------------------------------
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const bgEl = document.getElementById('bg');
+const overlay = document.getElementById('overlay');
+const startBtn = document.getElementById('start');
+const tipEl = document.getElementById('tip');
+const gearBtn = document.getElementById('gear');
+const panel = document.getElementById('panel');
+const toastEl = document.getElementById('toast');
+
+const DPR_CAP = 2;            // Akku: mehr als 2x sieht man bei Blasen nicht
+const MAX_SUBSTEP = 1 / 120;  // Physik-Teilschritt
+const MAX_DT = 1 / 20;        // dt-Deckel (z. B. nach Ruckler)
+
+const IS_IOS = /iP(hone|ad|od)/.test(navigator.userAgent) ||
+  (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+let W = 0, H = 0, dpr = 1;
+
+// ---------------------------------------------------------------------------
+// Einstellungen (localStorage)
+// ---------------------------------------------------------------------------
+const SETTINGS_KEY = 'seifenblasen.settings.v1';
+const DEFAULTS = { count: 15, size: 1, speed: 1, tilt: 1 };
+let settings = Object.assign({}, DEFAULTS);
+try {
+  const s = JSON.parse(localStorage.getItem(SETTINGS_KEY) || 'null');
+  if (s && typeof s === 'object') {
+    for (const k of Object.keys(DEFAULTS)) {
+      if (typeof s[k] === 'number' && isFinite(s[k])) settings[k] = s[k];
+    }
+  }
+} catch (e) { /* kein Speicher – Standardwerte */ }
+let saveTimer = 0;
+function saveSettings() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch (e) {}
+  }, 300);
+}
+
+// ---------------------------------------------------------------------------
+// Blasen-Sprites (einmal vorrendern, danach nur drawImage)
+// ---------------------------------------------------------------------------
+function makeCanvas(w, h) {
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  return c;
+}
+const HAS_CONIC = typeof CanvasRenderingContext2D !== 'undefined' &&
+  typeof CanvasRenderingContext2D.prototype.createConicGradient === 'function';
+
+function conic(g, start, cx, cy, stops) {
+  if (HAS_CONIC) {
+    const gr = g.createConicGradient(start, cx, cy);
+    stops.forEach(([o, c]) => gr.addColorStop(o, c));
+    return gr;
+  }
+  // Fallback (ohne Konik-Verlauf): diagonaler Linearverlauf
+  const r = cx;
+  const gr = g.createLinearGradient(cx - r * Math.cos(start), cy - r * Math.sin(start),
+    cx + r * Math.cos(start), cy + r * Math.sin(start));
+  stops.forEach(([o, c]) => gr.addColorStop(o, c));
+  return gr;
+}
+
+// Weicher Lichtbogen entlang des Randes (radial weich, an den Enden ausgeblendet)
+function softArc(target, cx, cy, rMid, width, a0, a1, alpha, color) {
+  const S = target.canvas.width;
+  const t = makeCanvas(S, S);
+  const g = t.getContext('2d');
+  const r0 = Math.max(0, rMid - width), r1 = rMid + width;
+  const rg = g.createRadialGradient(cx, cy, r0, cx, cy, r1);
+  rg.addColorStop(0, 'rgba(' + color + ',0)');
+  rg.addColorStop(0.5, 'rgba(' + color + ',' + alpha + ')');
+  rg.addColorStop(1, 'rgba(' + color + ',0)');
+  g.fillStyle = rg;
+  g.beginPath(); g.arc(cx, cy, r1, 0, Math.PI * 2); g.arc(cx, cy, r0, 0, Math.PI * 2, true); g.fill();
+  if (HAS_CONIC) {
+    // Winkel-Maske: nur zwischen a0..a1 sichtbar, zur Mitte hin voll
+    const span = a1 - a0;
+    const cg = g.createConicGradient(a0, cx, cy);
+    const f = span / (Math.PI * 2);
+    cg.addColorStop(0, 'rgba(0,0,0,0)');
+    cg.addColorStop(f * 0.5, 'rgba(0,0,0,1)');
+    cg.addColorStop(f, 'rgba(0,0,0,0)');
+    cg.addColorStop(1, 'rgba(0,0,0,0)');
+    g.globalCompositeOperation = 'destination-in';
+    g.fillStyle = cg;
+    g.fillRect(0, 0, S, S);
+  }
+  target.drawImage(t, 0, 0);
+}
+
+function softSpot(g, x, y, r, rgba0, rgba1) {
+  const rg = g.createRadialGradient(x, y, 0, x, y, r);
+  rg.addColorStop(0, rgba0);
+  rg.addColorStop(1, rgba1);
+  g.fillStyle = rg;
+  g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill();
+}
+
+// Erzeugt zwei Ebenen: "film" (drehbar: Interferenzfarben, Randabdunklung) und
+// "hl" (fest: Glanzlichter, Gegenreflex). rr = Radius in Gerätepixeln.
+function renderSprite(rr, look) {
+  const pad = 3;
+  const S = Math.ceil(rr * 2 + pad * 2);
+  const c = S / 2;
+
+  // --- Film-Ebene ---------------------------------------------------------
+  const film = makeCanvas(S, S);
+  const f = film.getContext('2d');
+
+  // 1) Interferenzfarben als Konikverlauf, mehrfach umlaufend
+  const h = look.hue;
+  const col = (dh, s, l, a) => 'hsla(' + ((h + dh) % 360 + 360) % 360 + ',' + s + '%,' + l + '%,' + a + ')';
+  const stops = [
+    [0.00, col(0, 100, 66, 1)],    // Magenta
+    [0.14, col(60, 100, 62, 1)],
+    [0.27, col(130, 95, 60, 1)],   // Cyan-ish
+    [0.40, col(190, 95, 62, 1)],
+    [0.52, col(250, 100, 66, 1)],  // Gelb-Grün
+    [0.63, col(300, 100, 64, 1)],
+    [0.76, col(20, 100, 66, 1)],
+    [0.88, col(150, 95, 60, 1)],
+    [1.00, col(0, 100, 66, 1)],
+  ];
+  f.fillStyle = conic(f, look.phase, c, c, stops);
+  f.beginPath(); f.arc(c, c, rr, 0, Math.PI * 2); f.fill();
+
+  // 2) Wirbelnde "Schlieren" im Film: weiche Farbflecken (zweiter Konikverlauf, gegenläufig)
+  f.globalCompositeOperation = 'source-atop';
+  f.globalAlpha = 0.55;
+  const stops2 = [
+    [0.00, col(200, 100, 60, 1)],
+    [0.20, col(320, 100, 65, 1)],
+    [0.45, col(80, 100, 60, 1)],
+    [0.70, col(170, 100, 60, 1)],
+    [1.00, col(200, 100, 60, 1)],
+  ];
+  const off = rr * 0.18;
+  f.fillStyle = conic(f, look.phase * -1.7 + 1, c + off * look.sx, c + off * look.sy, stops2);
+  f.fillRect(0, 0, S, S);
+  f.globalAlpha = 1;
+
+  // 3) Alpha-Maske: Mitte fast klar, Rand kräftig farbig (Dünnfilm-Rand)
+  f.globalCompositeOperation = 'destination-in';
+  const m = f.createRadialGradient(c, c, 0, c, c, rr);
+  m.addColorStop(0.00, 'rgba(0,0,0,0.05)');
+  m.addColorStop(0.45, 'rgba(0,0,0,0.09)');
+  m.addColorStop(0.68, 'rgba(0,0,0,0.20)');
+  m.addColorStop(0.82, 'rgba(0,0,0,0.38)');
+  m.addColorStop(0.92, 'rgba(0,0,0,0.72)');
+  m.addColorStop(0.975, 'rgba(0,0,0,0.95)');
+  m.addColorStop(1.00, 'rgba(0,0,0,0.25)');
+  f.fillStyle = m;
+  f.fillRect(0, 0, S, S);
+
+  // 4) Unter den Farben: leichte Abdunklung am Rand (sichtbar auf Bildern)
+  f.globalCompositeOperation = 'destination-over';
+  const d = f.createRadialGradient(c, c, rr * 0.7, c, c, rr);
+  d.addColorStop(0, 'rgba(0,0,0,0)');
+  d.addColorStop(0.75, 'rgba(0,0,10,0.10)');
+  d.addColorStop(0.95, 'rgba(0,0,10,0.26)');
+  d.addColorStop(1, 'rgba(0,0,10,0)');
+  f.fillStyle = d;
+  f.beginPath(); f.arc(c, c, rr, 0, Math.PI * 2); f.fill();
+
+  // 5) Zarte Tönung des Inneren
+  const tint = f.createRadialGradient(c - rr * 0.15, c - rr * 0.2, 0, c, c, rr);
+  tint.addColorStop(0, 'hsla(' + look.tint + ',80%,75%,0.0)');
+  tint.addColorStop(0.75, 'hsla(' + look.tint + ',80%,70%,0.05)');
+  tint.addColorStop(1, 'hsla(' + look.tint + ',80%,70%,0.0)');
+  f.fillStyle = tint;
+  f.beginPath(); f.arc(c, c, rr, 0, Math.PI * 2); f.fill();
+  f.globalCompositeOperation = 'source-over';
+
+  // 6) Hauchdünne helle Außenkante
+  f.strokeStyle = 'rgba(255,255,255,0.22)';
+  f.lineWidth = Math.max(0.8, rr * 0.012);
+  f.beginPath(); f.arc(c, c, rr - f.lineWidth * 0.5, 0, Math.PI * 2); f.stroke();
+
+  // --- Glanz-Ebene (bleibt fest, Licht kommt von oben links) --------------
+  const hl = makeCanvas(S, S);
+  const g = hl.getContext('2d');
+
+  // Großer weicher Glanz oben links (Ellipse)
+  g.save();
+  g.translate(c - rr * 0.40, c - rr * 0.44);
+  g.rotate(-Math.PI / 4);
+  g.scale(1, 0.58);
+  softSpot(g, 0, 0, rr * 0.36, 'rgba(255,255,255,0.55)', 'rgba(255,255,255,0)');
+  g.restore();
+
+  // Fensterartiger Lichtbogen am Rand oben links
+  softArc(g, c, c, rr * 0.80, rr * 0.07, Math.PI * 1.03, Math.PI * 1.47, 0.75, '255,255,255');
+  // Breiter, sehr zarter Bogen
+  softArc(g, c, c, rr * 0.88, rr * 0.10, Math.PI * 0.95, Math.PI * 1.6, 0.18, '255,255,255');
+
+  // Kleiner, heller Spitzlichtpunkt
+  softSpot(g, c - rr * 0.50, c - rr * 0.36, rr * 0.075, 'rgba(255,255,255,0.95)', 'rgba(255,255,255,0)');
+  softSpot(g, c - rr * 0.33, c - rr * 0.56, rr * 0.05, 'rgba(255,255,255,0.7)', 'rgba(255,255,255,0)');
+
+  // Gegenreflex unten rechts: Sichel + weicher Fleck
+  softArc(g, c, c, rr * 0.84, rr * 0.065, Math.PI * 0.05, Math.PI * 0.45, 0.5, '235,245,255');
+  softSpot(g, c + rr * 0.48, c + rr * 0.50, rr * 0.16, 'rgba(255,255,255,0.16)', 'rgba(255,255,255,0)');
+
+  return { film, hl, S, rr };
+}
+
+// ---------------------------------------------------------------------------
+// Blasen
+// ---------------------------------------------------------------------------
+const bubbles = [];
+const rand = (a, b) => a + Math.random() * (b - a);
+
+function newLook() {
+  return {
+    hue: rand(0, 360),
+    tint: rand(0, 360),
+    phase: rand(0, Math.PI * 2),
+    sx: rand(-1, 1), sy: rand(-1, 1),
+  };
+}
+
+let areaScale = 1;
+function computeAreaScale() {
+  // Blasen dürfen zusammen höchstens ~45 % der Fläche bedecken, sonst gibt es Dauerüberlappung
+  const minDim = Math.min(W, H);
+  let area = 0;
+  for (const b of bubbles) {
+    const r = baseRadius(b.rf, minDim, 1);
+    area += Math.PI * r * r;
+  }
+  const maxArea = 0.45 * W * H;
+  areaScale = area > maxArea ? Math.sqrt(maxArea / area) : 1;
+}
+function baseRadius(rf, minDim, scale) {
+  return minDim * (0.065 + 0.095 * Math.pow(rf, 1.3)) * settings.size * scale;
+}
+
+function updateRadii() {
+  computeAreaScale();
+  const minDim = Math.min(W, H);
+  for (const b of bubbles) {
+    b.r = baseRadius(b.rf, minDim, areaScale);
+    b.m = b.r * b.r;
+    const rr = b.r * dpr;
+    if (!b.sprite || Math.abs(b.sprite.rr - rr) > 0.5) b.sprite = renderSprite(rr, b.look);
+  }
+}
+
+function cruiseSpeed() { return 42 * settings.speed; }
+
+function addBubble() {
+  const b = {
+    rf: Math.random(),
+    look: newLook(),
+    x: 0, y: 0, vx: 0, vy: 0, r: 10, m: 100,
+    sf: rand(0.8, 1.2),            // persönlicher Tempo-Faktor
+    turn: 0,                       // langsame Richtungsdrift
+    ang: rand(0, Math.PI * 2),     // Drehung der Filmfarben
+    spin: rand(0.06, 0.2) * (Math.random() < 0.5 ? -1 : 1),
+    wob: 0.012, wobPh: rand(0, Math.PI * 2), wobF: rand(1.0, 1.7),
+    sprite: null,
+  };
+  bubbles.push(b);
+  return b;
+}
+
+function placeBubble(b) {
+  // möglichst überlappungsfreie Position suchen
+  for (let tries = 0; tries < 60; tries++) {
+    const x = rand(b.r, Math.max(b.r, W - b.r));
+    const y = rand(b.r, Math.max(b.r, H - b.r));
+    let ok = true;
+    for (const o of bubbles) {
+      if (o === b || !o.placed) continue;
+      const dx = o.x - x, dy = o.y - y, rs = o.r + b.r;
+      if (dx * dx + dy * dy < rs * rs) { ok = false; break; }
+    }
+    b.x = x; b.y = y;
+    if (ok) break;
+  }
+  const a = rand(0, Math.PI * 2), s = cruiseSpeed() * b.sf;
+  b.vx = Math.cos(a) * s; b.vy = Math.sin(a) * s;
+  b.placed = true;
+}
+
+function setCount(n) {
+  n = Math.max(1, Math.round(n));
+  while (bubbles.length > n) bubbles.pop();
+  const added = [];
+  while (bubbles.length < n) added.push(addBubble());
+  updateRadii();
+  for (const b of added) placeBubble(b);
+}
+
+// ---------------------------------------------------------------------------
+// Größe / Ausrichtung
+// ---------------------------------------------------------------------------
+function resize() {
+  const w = Math.max(1, canvas.clientWidth || window.innerWidth);
+  const h = Math.max(1, canvas.clientHeight || window.innerHeight);
+  const nd = Math.min(window.devicePixelRatio || 1, DPR_CAP);
+  const changed = w !== W || h !== H || nd !== dpr;
+  if (!changed && canvas.width) return;
+  const oldW = W, oldH = H;
+  W = w; H = h; dpr = nd;
+  canvas.width = Math.round(W * dpr);
+  canvas.height = Math.round(H * dpr);
+  // Positionen proportional übertragen (z. B. Drehen hoch/quer)
+  if (oldW > 0 && oldH > 0) {
+    for (const b of bubbles) { b.x = b.x / oldW * W; b.y = b.y / oldH * H; }
+  }
+  updateRadii();
+  for (const b of bubbles) clampToBounds(b);
+}
+window.addEventListener('resize', resize);
+window.addEventListener('orientationchange', () => { resize(); setTimeout(resize, 350); });
+if (window.visualViewport) window.visualViewport.addEventListener('resize', resize);
+
+function clampToBounds(b) {
+  const r = Math.min(b.r, W / 2, H / 2);
+  if (b.x < r) b.x = r; else if (b.x > W - r) b.x = W - r;
+  if (b.y < r) b.y = r; else if (b.y > H - r) b.y = H - r;
+  if (!isFinite(b.x) || !isFinite(b.y)) { b.x = W / 2; b.y = H / 2; }
+  if (!isFinite(b.vx) || !isFinite(b.vy)) { b.vx = cruiseSpeed(); b.vy = 0; }
+}
+
+// ---------------------------------------------------------------------------
+// Neigung (Bewegungssensor)
+// ---------------------------------------------------------------------------
+// Wir arbeiten intern mit dem SCHWERKRAFT-Vektor (zeigt Richtung Erde) in
+// Geräte-Koordinaten: x = nach rechts, y = zur Oberkante des Geräts.
+//
+// accelerationIncludingGravity:
+//   - Spezifikation / Android (Chrome): Wert ist die Gegenkraft. Liegt das Gerät
+//     flach, ist z = +9.81; steht es aufrecht, ist y = +9.81.
+//     -> Schwerkraft = -Wert
+//   - iOS Safari: Vorzeichen invertiert gegenüber der Spezifikation (flach: z = -9.81,
+//     aufrecht: y = -9.81). -> Schwerkraft = Wert
+// Zusätzlich gibt es unten eine Selbstkorrektur (siehe calib), falls eine
+// Plattform sich anders verhält als erwartet.
+const tilt = {
+  raw: null,             // Schwerkraft in Geräte-Koordinaten {x, y} (m/s²)
+  source: 'none',        // 'motion' | 'orientation' | 'none'
+  sm: { x: 0, y: 0 },    // geglättet (Bildschirm-Koordinaten)
+  rest: { x: 0, y: 0 },  // langsam nachgeführte Ruhelage
+  force: { x: 0, y: 0 }, // Differenz -> Kraft
+  init: false,
+  lastEvent: 0,
+  calib: { portrait: 1, landscape: 1 }, // Vorzeichen-Selbstkorrektur je Ausrichtung
+  upsideTime: 0,
+  lastAngle: 0,
+};
+const TAU_SMOOTH = 0.06;  // s: Sensorrauschen glätten
+const TAU_REST = 4.0;     // s: Ruhelage folgt langsam -> stilles Halten = wieder frei
+const TILT_GAIN = 75;     // px/s² pro m/s² Abweichung
+
+function screenAngle() {
+  // iOS: window.orientation ist zuverlässig (0, 90, -90, 180). Sonst screen.orientation.angle.
+  let a = 0;
+  if (typeof window.orientation === 'number') a = window.orientation;
+  else if (screen.orientation && typeof screen.orientation.angle === 'number') a = screen.orientation.angle;
+  a = ((Math.round(a / 90) * 90) % 360 + 360) % 360; // -> 0, 90, 180, 270
+  return a;
+}
+
+// Geräte-Schwerkraft -> Bildschirm-Koordinaten (x rechts, y unten)
+function deviceToScreen(gx, gy, angle) {
+  const a = gx, b = -gy;   // Hochformat: y des Geräts zeigt nach oben, Bildschirm-y nach unten
+  switch (angle) {
+    case 90:  return { x: b, y: -a };   // gegen den Uhrzeigersinn gedreht (Oberkante links)
+    case 180: return { x: -a, y: -b };
+    case 270: return { x: -b, y: a };   // im Uhrzeigersinn gedreht (Oberkante rechts)
+    default:  return { x: a, y: b };
+  }
+}
+
+function onMotion(e) {
+  const a = e.accelerationIncludingGravity;
+  if (!a || a.x == null || a.y == null || !isFinite(a.x) || !isFinite(a.y)) return;
+  const s = IS_IOS ? 1 : -1;  // siehe Kommentar oben: iOS liefert bereits die Schwerkraft-Richtung
+  tilt.raw = { x: s * a.x, y: s * a.y };
+  tilt.source = 'motion';
+  tilt.lastEvent = performance.now();
+}
+function onOrientation(e) {
+  if (tilt.source === 'motion' && performance.now() - tilt.lastEvent < 1000) return;
+  if (e.beta == null || e.gamma == null) return;
+  const b = e.beta * Math.PI / 180, g = e.gamma * Math.PI / 180;
+  // Schwerkraft-Richtung aus Euler-Winkeln (Z-X'-Y''): g = (sinγ·cosβ, -sinβ, -cosβ·cosγ)
+  tilt.raw = { x: 9.81 * Math.sin(g) * Math.cos(b), y: -9.81 * Math.sin(b) };
+  tilt.source = 'orientation';
+  tilt.lastEvent = performance.now();
+}
+let sensorsAttached = false;
+function attachSensors() {
+  if (sensorsAttached) return;
+  sensorsAttached = true;
+  window.addEventListener('devicemotion', onMotion);
+  window.addEventListener('deviceorientation', onOrientation);
+}
+
+function updateTilt(dt) {
+  if (!tilt.raw) { tilt.force.x = tilt.force.y = 0; return; }
+  const angle = screenAngle();
+  const cls = (angle === 90 || angle === 270) ? 'landscape' : 'portrait';
+  const k = tilt.calib[cls];
+  const g = deviceToScreen(tilt.raw.x, tilt.raw.y, angle);
+  g.x *= k; g.y *= k;
+  if (!tilt.init || angle !== tilt.lastAngle) {
+    tilt.sm.x = tilt.rest.x = g.x; tilt.sm.y = tilt.rest.y = g.y;
+    tilt.init = true; tilt.lastAngle = angle;
+  }
+  const as = 1 - Math.exp(-dt / TAU_SMOOTH);
+  tilt.sm.x += (g.x - tilt.sm.x) * as;
+  tilt.sm.y += (g.y - tilt.sm.y) * as;
+  const ar = 1 - Math.exp(-dt / TAU_REST);
+  tilt.rest.x += (tilt.sm.x - tilt.rest.x) * ar;
+  tilt.rest.y += (tilt.sm.y - tilt.rest.y) * ar;
+
+  // Selbstkorrektur: Bei normal gehaltenem Gerät zeigt die Schwerkraft auf dem
+  // Bildschirm nach unten. Zeigt sie lange kräftig nach OBEN, ist das Vorzeichen
+  // für diese Ausrichtung falsch (andere Plattform-Konvention) -> umdrehen.
+  if (tilt.sm.y < -7 && Math.abs(tilt.sm.x) < 4) {
+    tilt.upsideTime += dt;
+    if (tilt.upsideTime > 2) {
+      tilt.calib[cls] *= -1;
+      tilt.upsideTime = 0;
+      tilt.init = false;
+    }
+  } else tilt.upsideTime = 0;
+
+  let fx = tilt.sm.x - tilt.rest.x, fy = tilt.sm.y - tilt.rest.y;
+  // kleine Totzone gegen Sensorrauschen
+  const mag = Math.hypot(fx, fy), dz = 0.12;
+  if (mag < dz) { fx = fy = 0; }
+  else { const s = (mag - dz) / mag; fx *= s; fy *= s; }
+  const gain = TILT_GAIN * settings.tilt;
+  tilt.force.x = fx * gain;
+  tilt.force.y = fy * gain;
+}
+
+// ---------------------------------------------------------------------------
+// Physik
+// ---------------------------------------------------------------------------
+const V_MAX = 950;  // px/s
+const WALL_E = 0.9;
+const BALL_E = 1.0; // elastisch
+
+function physics(dt) {
+  updateTilt(dt);
+  const cruise = cruiseSpeed();
+  const fx = tilt.force.x, fy = tilt.force.y;
+  const aUp = 1 - Math.exp(-dt / 1.0);
+  const aDown = Math.exp(-dt / 2.2);
+
+  for (const b of bubbles) {
+    b.vx += fx * dt; b.vy += fy * dt;
+
+    // langsame Richtungsdrift für lebendige Bahnen
+    b.turn += (Math.random() - 0.5) * 1.2 * dt;
+    b.turn *= Math.exp(-dt / 3);
+    const t = b.turn * dt, ct = Math.cos(t), st = Math.sin(t);
+    const nvx = b.vx * ct - b.vy * st; b.vy = b.vx * st + b.vy * ct; b.vx = nvx;
+
+    // auf Reisegeschwindigkeit zurückführen
+    let sp = Math.hypot(b.vx, b.vy);
+    const target = cruise * b.sf;
+    if (sp < 1e-3) {
+      const a = rand(0, Math.PI * 2);
+      b.vx = Math.cos(a) * 1e-3; b.vy = Math.sin(a) * 1e-3; sp = 1e-3;
+    }
+    let ns = sp < target ? sp + (target - sp) * aUp : target + (sp - target) * aDown;
+    if (ns > V_MAX) ns = V_MAX;
+    const k = ns / sp;
+    b.vx *= k; b.vy *= k;
+
+    b.x += b.vx * dt; b.y += b.vy * dt;
+    b.ang += b.spin * dt;
+    b.wobPh += b.wobF * Math.PI * 2 * dt;
+    b.wob += (0.012 - b.wob) * (1 - Math.exp(-dt / 0.8));
+    walls(b);
+  }
+
+  // Kreis-Kreis-Kollisionen (Masse ~ r²), 2 Durchgänge gegen Verkleben
+  for (let it = 0; it < 2; it++) {
+    for (let i = 0; i < bubbles.length; i++) {
+      const p = bubbles[i];
+      for (let j = i + 1; j < bubbles.length; j++) {
+        const q = bubbles[j];
+        const dx = q.x - p.x, dy = q.y - p.y, rs = p.r + q.r;
+        const d2 = dx * dx + dy * dy;
+        if (d2 >= rs * rs) continue;
+        let d = Math.sqrt(d2), nx, ny;
+        if (d < 1e-6) { const a = rand(0, Math.PI * 2); nx = Math.cos(a); ny = Math.sin(a); d = 0; }
+        else { nx = dx / d; ny = dy / d; }
+        const overlap = rs - d;
+        const im = 1 / p.m, jm = 1 / q.m, sum = im + jm;
+        p.x -= nx * overlap * (im / sum); p.y -= ny * overlap * (im / sum);
+        q.x += nx * overlap * (jm / sum); q.y += ny * overlap * (jm / sum);
+        const vrel = (q.vx - p.vx) * nx + (q.vy - p.vy) * ny;
+        if (vrel < 0) {
+          const J = -(1 + BALL_E) * vrel / sum;
+          p.vx -= J * im * nx; p.vy -= J * im * ny;
+          q.vx += J * jm * nx; q.vy += J * jm * ny;
+          const bump = Math.min(0.06, -vrel / 4000);
+          p.wob = Math.max(p.wob, 0.012 + bump * Math.sqrt(q.m / (p.m + q.m)) * 1.5);
+          q.wob = Math.max(q.wob, 0.012 + bump * Math.sqrt(p.m / (p.m + q.m)) * 1.5);
+        }
+      }
+    }
+    for (const b of bubbles) walls(b);
+  }
+}
+
+function walls(b) {
+  const r = Math.min(b.r, W / 2, H / 2);
+  if (b.x < r) { b.x = r; if (b.vx < 0) b.vx = -b.vx * WALL_E; }
+  else if (b.x > W - r) { b.x = W - r; if (b.vx > 0) b.vx = -b.vx * WALL_E; }
+  if (b.y < r) { b.y = r; if (b.vy < 0) b.vy = -b.vy * WALL_E; }
+  else if (b.y > H - r) { b.y = H - r; if (b.vy > 0) b.vy = -b.vy * WALL_E; }
+  if (!isFinite(b.x + b.y + b.vx + b.vy)) clampToBounds(b);
+}
+
+function step(dt) {
+  if (!(dt > 0)) return;
+  dt = Math.min(dt, MAX_DT);
+  const n = Math.max(1, Math.ceil(dt / MAX_SUBSTEP - 1e-6));
+  const h = dt / n;
+  for (let i = 0; i < n; i++) physics(h);
+}
+
+// ---------------------------------------------------------------------------
+// Zeichnen
+// ---------------------------------------------------------------------------
+function draw() {
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  for (const b of bubbles) {
+    const sp = b.sprite;
+    if (!sp) continue;
+    const half = sp.S / 2;
+    const X = b.x * dpr, Y = b.y * dpr;
+    const w = b.wob * Math.sin(b.wobPh);
+    const sx = (1 + w) * (b.r * dpr / sp.rr), sy = (1 - w) * (b.r * dpr / sp.rr);
+    const c = Math.cos(b.ang), s = Math.sin(b.ang);
+    ctx.setTransform(sx * c, sy * s, -sx * s, sy * c, X, Y);
+    ctx.drawImage(sp.film, -half, -half);
+    ctx.setTransform(sx, 0, 0, sy, X, Y);
+    ctx.drawImage(sp.hl, -half, -half);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Schleife (pausiert, wenn versteckt)
+// ---------------------------------------------------------------------------
+let raf = 0, last = 0;
+function frame(t) {
+  raf = requestAnimationFrame(frame);
+  const dt = last ? (t - last) / 1000 : 0;
+  last = t;
+  step(dt);
+  draw();
+}
+function startLoop() { if (!raf) { last = 0; raf = requestAnimationFrame(frame); } }
+function stopLoop() { if (raf) cancelAnimationFrame(raf); raf = 0; }
+
+// ---------------------------------------------------------------------------
+// Berührung: Blasen sanft wegstoßen
+// ---------------------------------------------------------------------------
+const pointers = new Map();
+function pushAt(x, y, dirx, diry, strength) {
+  for (const b of bubbles) {
+    const dx = b.x - x, dy = b.y - y;
+    const reach = b.r + 70;
+    const d = Math.hypot(dx, dy);
+    if (d > reach) continue;
+    const fall = 1 - d / reach;
+    let nx, ny;
+    if (dirx !== undefined) { nx = dirx; ny = diry; }
+    else if (d > 1e-3) { nx = dx / d; ny = dy / d; }
+    else { const a = rand(0, Math.PI * 2); nx = Math.cos(a); ny = Math.sin(a); }
+    const imp = strength * fall * Math.sqrt(3000 / (b.m + 3000)) * 1.4;
+    b.vx += nx * imp; b.vy += ny * imp;
+    b.wob = Math.max(b.wob, 0.03);
+  }
+}
+canvas.addEventListener('pointerdown', (e) => {
+  pointers.set(e.pointerId, { x: e.clientX, y: e.clientY, t: performance.now() });
+  pushAt(e.clientX, e.clientY, undefined, undefined, 160);
+  if (started && panel.classList.contains('hidden')) showGear();
+});
+canvas.addEventListener('pointermove', (e) => {
+  const p = pointers.get(e.pointerId);
+  if (!p) return;
+  const now = performance.now();
+  const dtm = Math.max(8, now - p.t) / 1000;
+  const vx = (e.clientX - p.x) / dtm, vy = (e.clientY - p.y) / dtm;
+  const v = Math.hypot(vx, vy);
+  if (v > 30) {
+    const s = Math.min(320, v * 0.25);
+    pushAt(e.clientX, e.clientY, vx / v, vy / v, s * Math.min(1, dtm * 30));
+  }
+  p.x = e.clientX; p.y = e.clientY; p.t = now;
+});
+const endPointer = (e) => pointers.delete(e.pointerId);
+canvas.addEventListener('pointerup', endPointer);
+canvas.addEventListener('pointercancel', endPointer);
+
+// iOS: Zoom-/Scroll-Gesten unterbinden (außer in Schiebereglern / Panel)
+document.addEventListener('touchmove', (e) => {
+  if (!e.target.closest || !e.target.closest('#panel')) e.preventDefault();
+}, { passive: false });
+['gesturestart', 'gesturechange', 'gestureend'].forEach((n) =>
+  document.addEventListener(n, (e) => e.preventDefault(), { passive: false }));
+document.addEventListener('dblclick', (e) => e.preventDefault(), { passive: false });
+document.addEventListener('contextmenu', (e) => e.preventDefault());
+
+// ---------------------------------------------------------------------------
+// UI: Toast, Zahnrad, Panel
+// ---------------------------------------------------------------------------
+let toastTimer = 0;
+function toast(msg) {
+  toastEl.textContent = msg;
+  toastEl.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toastEl.classList.remove('show'), 2600);
+}
+let gearTimer = 0;
+function showGear() {
+  gearBtn.classList.add('show');
+  clearTimeout(gearTimer);
+  gearTimer = setTimeout(() => gearBtn.classList.remove('show'), 3000);
+}
+gearBtn.addEventListener('click', () => {
+  clearTimeout(gearTimer);
+  gearBtn.classList.remove('show');
+  panel.classList.remove('hidden');
+});
+document.getElementById('b-close').addEventListener('click', () => panel.classList.add('hidden'));
+
+const sliders = {
+  count: { el: document.getElementById('s-count'), out: document.getElementById('o-count'), fmt: (v) => String(Math.round(v)) },
+  size:  { el: document.getElementById('s-size'),  out: document.getElementById('o-size'),  fmt: (v) => Math.round(v * 100) + ' %' },
+  speed: { el: document.getElementById('s-speed'), out: document.getElementById('o-speed'), fmt: (v) => Math.round(v * 100) + ' %' },
+  tilt:  { el: document.getElementById('s-tilt'),  out: document.getElementById('o-tilt'),  fmt: (v) => v === 0 ? 'aus' : Math.round(v * 100) + ' %' },
+};
+for (const [key, s] of Object.entries(sliders)) {
+  s.el.value = settings[key];
+  s.out.textContent = s.fmt(settings[key]);
+  s.el.addEventListener('input', () => {
+    const v = parseFloat(s.el.value);
+    if (!isFinite(v)) return;
+    settings[key] = v;
+    s.out.textContent = s.fmt(v);
+    if (key === 'count') setCount(v);
+    else if (key === 'size') { updateRadii(); for (const b of bubbles) clampToBounds(b); }
+    saveSettings();
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Hintergrundbild (IndexedDB, Fallback: nur für die Sitzung)
+// ---------------------------------------------------------------------------
+const DB_NAME = 'seifenblasen', STORE = 'kv', BG_KEY = 'background';
+function idb() {
+  return new Promise((resolve, reject) => {
+    try {
+      if (!('indexedDB' in window) || !window.indexedDB) return reject(new Error('no idb'));
+      const req = indexedDB.open(DB_NAME, 1);
+      req.onupgradeneeded = () => { try { req.result.createObjectStore(STORE); } catch (e) {} };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+      req.onblocked = () => reject(new Error('blocked'));
+    } catch (e) { reject(e); }
+  });
+}
+async function idbOp(mode, fn) {
+  const db = await idb();
+  try {
+    return await new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE, mode);
+      const st = tx.objectStore(STORE);
+      const req = fn(st);
+      let result;
+      if (req) req.onsuccess = () => { result = req.result; };
+      tx.oncomplete = () => resolve(result);
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error);
+    });
+  } finally { try { db.close(); } catch (e) {} }
+}
+async function saveBg(blob) {
+  try { await idbOp('readwrite', (st) => st.put(blob, BG_KEY)); return true; }
+  catch (e) { return false; }
+}
+async function loadBg() {
+  try { const b = await idbOp('readonly', (st) => st.get(BG_KEY)); return b instanceof Blob ? b : null; }
+  catch (e) { return null; }
+}
+async function clearBg() {
+  try { await idbOp('readwrite', (st) => st.delete(BG_KEY)); } catch (e) {}
+}
+
+let bgUrl = null;
+function showBg(blob) {
+  if (bgUrl) { try { URL.revokeObjectURL(bgUrl); } catch (e) {} bgUrl = null; }
+  if (blob) {
+    bgUrl = URL.createObjectURL(blob);
+    bgEl.style.backgroundImage = 'url("' + bgUrl + '")';
+  } else {
+    bgEl.style.backgroundImage = 'none';
+  }
+}
+
+function loadImage(url) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error('Bild konnte nicht geladen werden'));
+    img.src = url;
+  });
+}
+async function downscale(file) {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await loadImage(url);
+    const iw = img.naturalWidth, ih = img.naturalHeight;
+    if (!iw || !ih) return file;
+    const pr = Math.min(window.devicePixelRatio || 1, 3);
+    const L = Math.max(screen.width || W, screen.height || H) * pr; // max. Bildschirmauflösung
+    const s = Math.min(1, L / Math.max(iw, ih));
+    const w = Math.max(1, Math.round(iw * s)), h = Math.max(1, Math.round(ih * s));
+    const c = makeCanvas(w, h);
+    const g = c.getContext('2d');
+    g.fillStyle = '#000'; g.fillRect(0, 0, w, h);
+    g.imageSmoothingQuality = 'high';
+    g.drawImage(img, 0, 0, w, h);
+    const blob = await new Promise((res) => {
+      try { c.toBlob((b) => res(b), 'image/jpeg', 0.9); } catch (e) { res(null); }
+    });
+    return blob || file;
+  } finally { URL.revokeObjectURL(url); }
+}
+
+const fileInput = document.getElementById('file');
+fileInput.addEventListener('change', async () => {
+  const file = fileInput.files && fileInput.files[0];
+  fileInput.value = '';
+  if (!file) return;
+  try {
+    const blob = await downscale(file);
+    showBg(blob);
+    const ok = await saveBg(blob);
+    if (!ok) toast('Bild nur für diese Sitzung');
+  } catch (e) {
+    toast('Bild konnte nicht geladen werden');
+  }
+});
+document.getElementById('b-black').addEventListener('click', () => { showBg(null); clearBg(); });
+
+// ---------------------------------------------------------------------------
+// Start: Sensor-Erlaubnis, Wake Lock, Overlay
+// ---------------------------------------------------------------------------
+let started = false;
+let wakeLock = null;
+async function requestWakeLock() {
+  try {
+    if (!('wakeLock' in navigator) || !navigator.wakeLock) return;
+    if (wakeLock && !wakeLock.released) return;
+    wakeLock = await navigator.wakeLock.request('screen');
+    wakeLock.addEventListener('release', () => { wakeLock = null; });
+  } catch (e) { wakeLock = null; }
+}
+
+async function requestMotionPermission() {
+  // Muss direkt aus der Nutzergeste aufgerufen werden (iOS)
+  let granted = true;
+  try {
+    if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+      const r = await DeviceMotionEvent.requestPermission();
+      granted = r === 'granted';
+    }
+  } catch (e) { granted = false; }
+  try {
+    if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+      const r = await DeviceOrientationEvent.requestPermission();
+      if (r === 'granted') granted = true;
+    }
+  } catch (e) { /* egal, Bewegung reicht */ }
+  return granted;
+}
+
+startBtn.addEventListener('click', async () => {
+  if (started) return;
+  started = true;
+  const permP = requestMotionPermission(); // zuerst, noch innerhalb der Geste
+  const wakeP = requestWakeLock();
+  overlay.classList.add('gone');
+  let granted = false;
+  try { granted = await permP; } catch (e) { granted = false; }
+  // Listener immer anhängen: ohne Erlaubnis kommen schlicht keine Events an
+  attachSensors();
+  try { await wakeP; } catch (e) {}
+  const hasApi = typeof DeviceMotionEvent !== 'undefined' || typeof DeviceOrientationEvent !== 'undefined';
+  if (!granted || !hasApi) { toast('Neigen nicht verfügbar'); return; }
+  setTimeout(() => { if (!tilt.raw) toast('Neigen nicht verfügbar'); }, 2500);
+});
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    startLoop();
+    if (started) requestWakeLock();
+  } else {
+    stopLoop();
+  }
+});
+
+function isStandalone() {
+  try {
+    if (navigator.standalone === true) return true;
+    if (window.matchMedia) {
+      return ['standalone', 'fullscreen', 'minimal-ui'].some((m) =>
+        window.matchMedia('(display-mode: ' + m + ')').matches);
+    }
+  } catch (e) {}
+  return false;
+}
+if (!isStandalone()) tipEl.hidden = false;
+// Ohne Erlaubnis-API (z. B. Android) können Sensoren sofort laufen
+if (typeof DeviceMotionEvent === 'undefined' || typeof DeviceMotionEvent.requestPermission !== 'function') attachSensors();
+
+// ---------------------------------------------------------------------------
+// Initialisierung
+// ---------------------------------------------------------------------------
+resize();
+setCount(settings.count);
+if (document.visibilityState !== 'hidden') startLoop();
+loadBg().then((b) => { if (b) showBg(b); }).catch(() => {});
+
+// Kleiner Debug-Zugang (stört nicht, nur für Tests)
+window.__bubbles = {
+  get list() { return bubbles; },
+  get size() { return { W, H, dpr }; },
+  tilt, settings,
+  simulate(seconds, hz) {
+    const h = 1 / (hz || 120);
+    const n = Math.round(seconds / h);
+    for (let i = 0; i < n; i++) step(h);
+    draw();
+  },
+  centroid() {
+    let sx = 0, sy = 0, m = 0;
+    for (const b of bubbles) { sx += b.x * b.m; sy += b.y * b.m; m += b.m; }
+    return { x: sx / m, y: sy / m };
+  },
+  pause: stopLoop, resume: startLoop,
+  setCount, renderSprite, newLook,
+};
+})();
+</script>
+</body>
+</html>
